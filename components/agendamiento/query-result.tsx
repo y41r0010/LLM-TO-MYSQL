@@ -21,7 +21,7 @@ export type ChartHint = { tipo?: "bar" | "line" | "none"; x?: string; y?: string
 
 export interface AssistantAnswer {
   pregunta: string;
-  sql: string;
+  sql?: string;
   result: Record<string, unknown>[];
   titulo?: string;
   explicacion?: string;
@@ -333,12 +333,17 @@ export function QueryResult({ answer }: { answer: AssistantAnswer }) {
         </>
       )}
 
-      <details className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-        <summary className="cursor-pointer text-muted-foreground">
-          Ver SQL{answer.explicacion ? ` · ${answer.explicacion}` : ""}
-        </summary>
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-background p-2 text-xs">{answer.sql}</pre>
-      </details>
+      {/* The server only sends the SQL when ASSISTANT_SHOW_SQL allows it. */}
+      {answer.sql ? (
+        <details className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">
+            Ver SQL{answer.explicacion ? ` · ${answer.explicacion}` : ""}
+          </summary>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-background p-2 text-xs">{answer.sql}</pre>
+        </details>
+      ) : (
+        answer.explicacion && <p className="text-sm text-muted-foreground">{answer.explicacion}</p>
+      )}
     </div>
   );
 }

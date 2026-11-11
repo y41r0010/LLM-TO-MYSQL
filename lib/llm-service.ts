@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 const apiKey = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY;
 const baseURL = process.env.OPENAI_BASE_URL || process.env.LLM_BASE_URL;
@@ -14,10 +15,22 @@ let client: OpenAI | null = null;
 function getClient(): OpenAI {
   if (!apiKey || !baseURL || !model) {
     throw new Error(
-      "Falta configurar el modelo de IA: define LLM_API_KEY, LLM_BASE_URL y LLM_MODEL en .env.local."
+      "Falta configurar el modelo de IA: define LLM_API_KEY, LLM_BASE_URL y LLM_MODEL en la configuración del servidor."
     );
   }
-  if (!client) client = new OpenAI({ apiKey, baseURL });
+  if (!client) {
+    // Servers without direct internet access reach the AI API through an HTTP proxy.
+    const proxyUrl = process.env.LLM_PROXY_URL || process.env.HTTPS_PROXY || process.env.https_proxy;
+    client = new OpenAI({
+      apiKey,
+      baseURL,
+      timeout: 60_000,
+      // Use undici's own fetch with its ProxyAgent: Node's built-in fetch may ship a different undici version.
+      ...(proxyUrl
+        ? { fetch: undiciFetch as unknown as typeof fetch, fetchOptions: { dispatcher: new ProxyAgent(proxyUrl) } as any }
+        : {}),
+    });
+  }
   return client;
 }
 

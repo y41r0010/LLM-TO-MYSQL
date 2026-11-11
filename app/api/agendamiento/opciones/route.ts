@@ -4,6 +4,7 @@ import type { OptionSource } from "@/lib/agendamiento/resources";
 
 // Choices for the select filters. Small lookup tables, cached briefly in memory.
 
+import { publicError } from "@/lib/security";
 export const dynamic = "force-dynamic";
 
 type Option = { value: string; label: string };
@@ -44,9 +45,8 @@ export async function GET() {
     globalCache.agendaOptions = { at: Date.now(), data };
     return NextResponse.json({ success: true, data });
   } catch (error: any) {
-    console.error("[api/agendamiento/opciones]", error);
     return NextResponse.json(
-      { success: false, error: `No se pudieron cargar los filtros: ${error?.message ?? ""}` },
+      { success: false, error: publicError("api/agendamiento/opciones", error, "No se pudieron cargar los filtros.") },
       { status: 500 }
     );
   }

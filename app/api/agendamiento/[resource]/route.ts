@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isResourceKey } from "@/lib/agendamiento/resources";
 import { exportResource, parseResourceQuery, queryResource, toCsv } from "@/lib/agendamiento/queries";
 
+import { publicError } from "@/lib/security";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ resource: string }> }) {
@@ -26,9 +27,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ reso
     const { rows, total } = await queryResource(resource, query);
     return NextResponse.json({ success: true, rows, total, page: query.page, pageSize: query.pageSize });
   } catch (error: any) {
-    console.error(`[api/agendamiento/${resource}]`, error);
     return NextResponse.json(
-      { success: false, error: `No se pudieron consultar los datos: ${error?.message ?? "error desconocido"}` },
+      { success: false, error: publicError(`api/agendamiento/${resource}`, error, "No se pudieron consultar los datos.") },
       { status: 500 }
     );
   }

@@ -73,6 +73,11 @@ function openSshTunnel(onClose: () => void): Promise<number> {
 }
 
 async function createPool(): Promise<Pool> {
+  const missing = ['DB_USER', 'DB_NAME'].filter((k) => !process.env[k]);
+  if (missing.length) {
+    throw new Error(`Falta configurar la base de datos: ${missing.join(', ')}.`);
+  }
+
   let host = DB_HOST;
   let port = DB_PORT;
 
@@ -87,9 +92,10 @@ async function createPool(): Promise<Pool> {
   return mysql.createPool({
     host,
     port,
-    user: process.env.DB_USER || 'root',
+    user: process.env.DB_USER,
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'ecommerce',
+    database: process.env.DB_NAME,
+    connectTimeout: 10000,
     connectionLimit: 8,
     dateStrings: true,
     // SUM()/AVG()/DECIMAL come back as numbers instead of strings, so charts work.

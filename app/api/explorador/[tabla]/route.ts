@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { executeReadOnly } from "@/lib/db";
 import { getTable, quoteIdent } from "@/lib/agendamiento/schema";
 import { CSV_MAX_ROWS, PAGE_SIZES, toCsv } from "@/lib/agendamiento/queries";
+import { explorerEnabled, publicError } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
 // Read-only, paginated rows of any table or view. The table and sort column are
 // checked against information_schema; the search text is a bound parameter.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ tabla: string }> }) {
+  if (!explorerEnabled()) {
+    return NextResponse.json({ success: false, error: "El explorador de tablas está deshabilitado." }, { status: 404 });
+  }
   const { tabla } = await params;
   const sp = req.nextUrl.searchParams;
 
@@ -64,9 +68,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tabl
 
     return NextResponse.json({ success: true, columns, rows, total: Number(count[0]?.total ?? 0) });
   } catch (error: any) {
-    console.error(`[api/explorador/${tabla}]`, error);
     return NextResponse.json(
-      { success: false, error: `No se pudo consultar ${tabla}: ${error?.message ?? ""}` },
+      { success: false, error: publicError(`api/explorador/${tabla}`, error, "No se pudo consultar la tabla.") },
       { status: 500 }
     );
   }
