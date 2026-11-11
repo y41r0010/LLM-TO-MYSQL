@@ -9,7 +9,7 @@ interface HeaderProps {
 
 export function Header({ toggleSidebar }: HeaderProps) {
   return (
-    <div className="border-b">
+    <div className="sticky top-0 z-40 border-b bg-background/75 backdrop-blur-md">
       <div className="flex h-16 items-center px-4">
         <Button
           variant="ghost"
@@ -17,7 +17,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
           onClick={toggleSidebar}
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Menu</span>
+          <span className="sr-only">Abrir menú</span>
         </Button>
         <div className="ml-auto flex items-center space-x-4">
           <Button

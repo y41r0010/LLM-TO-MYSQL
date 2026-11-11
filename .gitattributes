@@ -1,0 +1,12 @@
+# Saltos de línea LF en el repositorio y en la copia de trabajo, en cualquier sistema.
+* text=auto eol=lf
+
+# Archivos binarios: sin conversión.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary

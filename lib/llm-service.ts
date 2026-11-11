@@ -6,67 +6,78 @@ const model = process.env.OPENAI_MODEL || process.env.LLM_MODEL;
 const provider = (process.env.LLM_PROVIDER || "gemini").toLowerCase();
 const defaultInstructions = "You are a helpful assistant.";
 
+type GenerateParams = { input: string; instructions?: string; stream?: boolean; [key: string]: any };
 
-if (!apiKey || !baseURL || !model) {
-  throw new Error("Missing llm configuration in environment variables.");
+// Validated on first use, not at import time: a missing variable then becomes a
+// normal error the API route can return as JSON instead of crashing the module.
+let client: OpenAI | null = null;
+function getClient(): OpenAI {
+  if (!apiKey || !baseURL || !model) {
+    throw new Error(
+      "Falta configurar el modelo de IA: define LLM_API_KEY, LLM_BASE_URL y LLM_MODEL en .env.local."
+    );
+  }
+  if (!client) client = new OpenAI({ apiKey, baseURL });
+  return client;
 }
-const openai = new OpenAI({ apiKey, baseURL });
 
 export interface LLMProvider {
-  generate(params: { input: string; instructions?: string; stream?: boolean; [key: string]: any }): Promise<any>;
+  generate(params: GenerateParams): Promise<any>;
+  /** Plain-text answer, whatever the provider's response shape. */
+  generateText(params: { input: string; instructions?: string }): Promise<string>;
 }
 
+function checkInput(input: unknown) {
+  if (!input || typeof input !== "string") {
+    throw new Error("Missing or invalid 'input' string.");
+  }
+}
+
+// Chat Completions API (used for Gemini through its OpenAI-compatible endpoint).
 export class GeminiLLMService implements LLMProvider {
-  
-  async generate({ input, instructions, stream = false, ...rest }: {
-    input: string;
-    instructions?: string;
-    stream?: boolean;
-    [key: string]: any;
-  }) {
-    if (!input || typeof input !== "string") {
-      throw new Error("Missing or invalid 'input' string.");
-    }
-    if (!instructions || typeof instructions !== "string") {
-      instructions = defaultInstructions;
-    }
-    return await openai.chat.completions.create({
+  async generate({ input, instructions, stream = false, ...rest }: GenerateParams) {
+    checkInput(input);
+    return await getClient().chat.completions.create({
       model: model as string,
       messages: [
-        {"role": "system", "content": instructions},
-        {"role": "user", "content": input}
+        { role: "system", content: instructions || defaultInstructions },
+        { role: "user", content: input },
       ],
       stream,
       ...rest,
     });
   }
-}
 
-export class OpenAILLMService implements LLMProvider {
-
-  async generate({ input, instructions, stream = false, ...rest }: {
-    input: string;
-    instructions?: string;
-    stream?: boolean;
-    [key: string]: any;
-  }): Promise<any> {
-    if (!input || typeof input !== "string") {
-      throw new Error("Missing or invalid 'input' string.");
-    }
-    if (!instructions || typeof instructions !== "string") {
-      instructions = defaultInstructions;
-    }
-    return await openai.responses.create({
-      model: model as string,
+  async generateText({ input, instructions }: { input: string; instructions?: string }) {
+    // Gemini "thinks" a lot by default; "low" is ~3x faster and still writes good SQL.
+    const effort = (process.env.LLM_REASONING_EFFORT || "low").toLowerCase();
+    const res: any = await this.generate({
       input,
       instructions,
+      ...(effort !== "default" ? { reasoning_effort: effort } : {}),
+    });
+    return (res.choices?.[0]?.message?.content ?? "").trim();
+  }
+}
+
+// Responses API (OpenAI).
+export class OpenAILLMService implements LLMProvider {
+  async generate({ input, instructions, stream = false, ...rest }: GenerateParams): Promise<any> {
+    checkInput(input);
+    return await getClient().responses.create({
+      model: model as string,
+      input,
+      instructions: instructions || defaultInstructions,
       stream,
       ...rest,
     });
   }
+
+  async generateText({ input, instructions }: { input: string; instructions?: string }) {
+    const res: any = await this.generate({ input, instructions });
+    return (res.output_text ?? "").trim();
+  }
 }
-
-
 
 let LLMService: LLMProvider;
 if (provider === "openai") {
