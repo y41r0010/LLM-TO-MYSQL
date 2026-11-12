@@ -29,6 +29,16 @@ Relaciones principales (no todas están declaradas como llaves foráneas):
 - citas_disponibles (cd) = cupos publicados. cd.fecha_cita, cd.id_hora_fk, cd.id_cfsm_fk (sede), cd.id_tipo_tramite_fk (trámite),
   cd.id_estado_tramite_fk -> estados (estado del cupo: 'EXPIRADO', 'AGENDADA', 'REGISTRADO', 'DISPONIBLE', ...).
   cd.id_lote_carga_fk -> agenda_lote_carga.id_lote (proceso que generó el cupo).
+- Carga vs. publicación de cupos (¡no confundir!):
+  1. CARGA: el lote crea los cupos en estado 1 'REGISTRADO' (aún NO visibles para el ciudadano).
+     cd.fecha_creacion = alc.started_at = hora de CARGA. Nunca la uses como fecha de publicación.
+  2. PUBLICACIÓN: un evento de la base pasa los cupos a estado 31 'DISPONIBLE' todos los días a las 17:00
+     para la fecha del día siguiente (hay también una publicación semanal). Al publicar, el lote queda con
+     alc.estado_publicacion = 1 y alc.updated_at = hora de PUBLICACIÓN.
+  - Fecha/hora de publicación de un cupo: JOIN agenda_lote_carga alc ON alc.id_lote = cd.id_lote_carga_fk,
+    usa alc.updated_at con alc.estado_publicacion = 1.
+  - Tiempo desde la publicación hasta que se tomó la cita: TIMESTAMPDIFF(MINUTE, alc.updated_at, ca.fecha_registro).
+  - Cuando el cupo vence sin ser tomado pasa a 23 'EXPIRADO'.
 - Ocupación: un cupo está ocupado si tiene una cita en citas_agendadas con id_estado_fk NOT IN (12, 42).
   La vista vista_agendamiento_diario ya lo calcula por día y sede (fecha, id_sede, sede, dispuestas, agendadas, disponibles):
   úsala para preguntas de ocupación/disponibilidad por fecha o sede.

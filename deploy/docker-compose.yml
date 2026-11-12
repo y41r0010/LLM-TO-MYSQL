@@ -1,0 +1,66 @@
+# Panel de agendamiento en el servidor de pruebas (172.20.3.205).
+#
+# Estructura en el servidor:
+#   /home/admin/LLM-TO-MYSQL/
+#   ├── docker-compose.yml   <- este archivo
+#   ├── panel.env            <- claves (chmod 600, nunca en el repositorio)
+#   └── app/                 <- aplicación compilada (viene en LLM-TO-MYSQL.tar.gz)
+#
+# Uso:  cd /home/admin/LLM-TO-MYSQL && sudo docker compose up -d
+# Ver deploy/README.md para la instalación completa.
+
+name: agendamiento-panel
+
+services:
+  panel:
+    # Solo Node: la aplicación ya viene compilada en ./app (build standalone),
+    # así que no hace falta construir una imagen ni ejecutar npm install en el servidor.
+    image: node:22-alpine
+    container_name: agendamiento-panel
+    working_dir: /app
+    command: ["node", "server.js"]
+    restart: unless-stopped
+
+    # Red del servidor: el contenedor llega a MariaDB por 127.0.0.1:3306 (el usuario
+    # panel_lectura solo acepta conexiones locales) y publica el panel en el puerto 3000.
+    network_mode: host
+
+    # Claves y configuración (DB_*, LLM_*, PANEL_*). Archivo solo legible por su dueño.
+    env_file:
+      - /home/admin/LLM-TO-MYSQL/panel.env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      # El servidor tiene poca memoria libre.
+      NODE_OPTIONS: --max-old-space-size=512
+
+    volumes:
+      # Código de la aplicación, de solo lectura. ":Z" etiqueta la carpeta para SELinux.
+      - /home/admin/LLM-TO-MYSQL/app:/app:ro,Z
+    tmpfs:
+      # Única carpeta donde Next escribe en tiempo de ejecución.
+      - /app/.next/cache
+      - /tmp
+
+    # Endurecimiento: usuario sin privilegios (admin, uid 1000), sistema de archivos
+    # de solo lectura y sin capacidades extra.
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
